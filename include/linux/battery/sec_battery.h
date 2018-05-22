@@ -53,8 +53,7 @@
 #define ADC_CH_COUNT		10
 #define ADC_SAMPLE_COUNT	10
 
-#define SEC_INPUT_VOLTAGE_5V	5
-#define SEC_INPUT_VOLTAGE_9V	9
+#define BATT_MISC_EVENT_UNDEFINED_RANGE_TYPE	0x00000001
 
 struct adc_sample_info {
 	unsigned int cnt;
@@ -139,9 +138,6 @@ struct sec_battery_info {
 	unsigned long charging_next_time;
 	unsigned long charging_fullcharged_time;
 
-	unsigned long lcd_on_total_time;
-	unsigned long lcd_on_time;
-
 	/* chg temperature check */
 	bool chg_limit;
 
@@ -213,6 +209,7 @@ struct sec_battery_info {
 	int stability_test;
 	int eng_not_full_status;
 
+	bool skip_chg_temp_check;
 #if defined(CONFIG_BATTERY_SWELLING_SELF_DISCHARGING)
 	bool factory_self_discharging_mode_on;
 	bool force_discharging;
@@ -220,6 +217,10 @@ struct sec_battery_info {
 	bool discharging_ntc;
 	int discharging_ntc_adc;
 	int self_discharging_adc;
+#endif
+#if defined(CONFIG_SW_SELF_DISCHARGING)
+	struct wake_lock self_discharging_wake_lock;
+	bool sw_self_discharging;
 #endif
 
 	bool charging_block;
@@ -240,9 +241,11 @@ struct sec_battery_info {
 	bool complete_timetofull;
 	struct delayed_work timetofull_work;
 #endif
-#if defined(CONFIG_BATTERY_SMART)
-	bool detect_invalid_port;
-#endif
+	struct mutex misclock;
+	unsigned int misc_event;
+	unsigned int prev_misc_event;
+	struct delayed_work misc_event_work;
+	struct wake_lock misc_event_wake_lock;
 };
 
 ssize_t sec_bat_show_attrs(struct device *dev,
@@ -352,6 +355,9 @@ enum {
 	BATT_DISCHARGING_NTC_ADC,
 	BATT_SELF_DISCHARGING_CONTROL,
 #endif
+#if defined(CONFIG_SW_SELF_DISCHARGING)
+	BATT_SW_SELF_DISCHARGING,
+#endif
 #if defined(CONFIG_WIRELESS_CHARGER_INBATTERY)
 	BATT_INBAT_WIRELESS_CS100,
 #endif
@@ -359,14 +365,12 @@ enum {
 	HMT_TA_CHARGE,
 #if defined(CONFIG_BATTERY_SMART)
 	FG_FIRMWARE,
-	DETECT_INVALID_PORT,
 #endif
 #if defined(CONFIG_BATTERY_AGE_FORECAST)
 	FG_CYCLE,
 	FG_FULL_VOLTAGE,
 #endif
-	FACTORY_MODE_RELIEVE,
-	FACTORY_MODE_BYPASS,
+	BATT_MISC_EVENT,
 };
 
 #ifdef CONFIG_OF
